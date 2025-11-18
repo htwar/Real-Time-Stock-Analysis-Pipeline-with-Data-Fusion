@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Real-Time Stock Analysis Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- External JS + CSS -->
+  <script defer src="/static/main.js"></script>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Real-Time Stock Analysis</h1>
+        <p class="subtitle">
+        </p>
+      </div>
+
+      <div>
+        <label for="ticker-select">Ticker: </label>
+        <select id="ticker-select"></select>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Price Chart Card -->
+      <div class="card">
+        <div class="card-header">
+          <h2>Price & 20-Period SMA</h2>
+          <span id="data-status" class="badge">Loading...</span>
+        </div>
+        <div class="chart-container">
+          <canvas id="price-chart"></canvas>
+        </div>
+      </div>
+
+      <!-- Fundamentals Card -->
+      <div class="card">
+        <h2>Fundamental Metrics</h2>
+        <dl id="fundamentals"></dl>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
