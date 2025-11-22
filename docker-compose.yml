@@ -4,39 +4,36 @@ services:
   realtimeprice-service:
     build:
       context: .
+      dockerfile: Dockerfile
     container_name: realtimeprice-service
     command: ["uvicorn", "real-time-price:app", "--host", "0.0.0.0", "--port", "8000"]
-    environment:
-      # No API key needed since we switched fully to yfinance
-      PRICE_INTERVAL_MINUTES: "5"
+    # No API key needed anymore
     ports:
       - "8001:8000"
     networks:
       - stocknet
-    restart: unless-stopped
 
   fundamentaldata-service:
     build:
       context: .
+      dockerfile: Dockerfile
     container_name: fundamentaldata-service
     command: ["uvicorn", "fundamental-data:app", "--host", "0.0.0.0", "--port", "8000"]
-    environment:
-      # No API key needed (using yfinance)
-      FUND_REFRESH_INTERVAL: "3600"
+    # No API key needed anymore
     ports:
       - "8002:8000"
     networks:
       - stocknet
-    restart: unless-stopped
 
   analysis-service:
     build:
       context: .
+      dockerfile: Dockerfile
     container_name: analysis-service
-    command: ["uvicorn", "analysis:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["streamlit", "run", "UI.py", "--server.port=8000", "--server.address=0.0.0.0"]
     environment:
       PRICE_SERVICE_URL: "http://realtimeprice-service:8000"
-      FUNDAMENTAL_SERVICE_URL: "http://fundamentaldata-service:8000"
+      FUNDAMENTAL_SERVICE_URL: "http://fundamentaldata-service:8000"  # 🔧 fixed name
     ports:
       - "8000:8000"
     depends_on:
@@ -44,7 +41,6 @@ services:
       - fundamentaldata-service
     networks:
       - stocknet
-    restart: unless-stopped
 
 networks:
   stocknet:

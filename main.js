@@ -2,30 +2,32 @@
 let chart = null;
 
 // ------------------------------
-// Fetch available tickers
+// API helpers
 // ------------------------------
 async function fetchTickers() {
   const resp = await fetch("/api/tickers");
-  if (!resp.ok) throw new Error("Error fetching tickers");
+  if (!resp.ok) {
+    throw new Error(`Error fetching tickers: ${resp.status}`);
+  }
   return resp.json();
 }
 
-// ------------------------------
-// Fetch dashboard bundle
-// ------------------------------
 async function fetchDashboardData(ticker) {
   const resp = await fetch(`/api/dashboard/${ticker}`);
-  if (!resp.ok) throw new Error("Error fetching dashboard data");
+  if (!resp.ok) {
+    throw new Error(`Error fetching dashboard data: ${resp.status}`);
+  }
   return resp.json();
 }
 
 // ------------------------------
-// Format helpers
+// Formatting helpers
 // ------------------------------
 function formatNumber2(x) {
   if (x == null || isNaN(x)) return "N/A";
   return Number(x).toFixed(2);
 }
+
 function formatMarketCap(x) {
   if (x == null || isNaN(x)) return "N/A";
   const n = Number(x);
@@ -34,52 +36,50 @@ function formatMarketCap(x) {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M";
   return n.toLocaleString("en-US");
 }
+
 function formatTimestamp(ts) {
   if (!ts) return "N/A";
   try {
-    return new Date(ts).toLocaleString();
+    const d = new Date(ts);
+    return d.toLocaleString();
   } catch {
     return ts;
   }
 }
 
 // ------------------------------
-// Update fundamentals panel
+// Fundamentals panel
 // ------------------------------
-function updateFundamentalsPanel(f) {
+function updateFundamentalsPanel(fundamentals) {
   const dl = document.getElementById("fundamentals");
   dl.innerHTML = "";
 
-  if (!f) {
+  if (!fundamentals) {
     dl.innerHTML = "<p>No fundamentals available.</p>";
     return;
   }
 
   const rows = [
-    ["P/E Ratio", formatNumber2(f.pe_ratio)],
-    ["Market Cap", formatMarketCap(f.market_cap)],
-    ["52-Week High", formatNumber2(f.week52_high)],
-    ["52-Week Low", formatNumber2(f.week52_low)],
-    ["Last Updated", formatTimestamp(f.updated_at)],
+    ["P/E Ratio", formatNumber2(fundamentals.pe_ratio)],
+    ["Market Cap", formatMarketCap(fundamentals.market_cap)],
+    ["52-Week High", formatNumber2(fundamentals.week52_high)],
+    ["52-Week Low", formatNumber2(fundamentals.week52_low)],
+    ["Last Updated", formatTimestamp(fundamentals.updated_at)],
   ];
 
-  rows.forEach(([label, value]) => {
+  for (const [label, value] of rows) {
     const dt = document.createElement("dt");
     dt.textContent = label;
     const dd = document.createElement("dd");
     dd.textContent = value;
     dl.appendChild(dt);
     dl.appendChild(dd);
-  });
+  }
 }
 
-// ------------------------------
-// Update freshness badge
-// ------------------------------
 function updateStatusBadge(isRecent) {
   const badge = document.getElementById("data-status");
   if (!badge) return;
-
   if (isRecent) {
     badge.textContent = "Data ≤ 15 min old";
     badge.classList.remove("stale");
@@ -90,122 +90,139 @@ function updateStatusBadge(isRecent) {
 }
 
 // ------------------------------
-// SMA fallback (if backend didn't compute it)
+// SMA fallback (if backend SMA missing)
 // ------------------------------
-function computeSMA(priceSeries, period = 20) {
-  const closes = priceSeries.map(p => p.close);
-  const result = [];
-
+function computeSMAFromPrices(priceSeries, period = 20) {
+  const closes = priceSeries.map((p) => p.close);
+  const sma = [];
   for (let i = 0; i < closes.length; i++) {
-    if (i < period - 1) {
-      result.push(null);
+    if (i + 1 < period) {
+      sma.push(null);
     } else {
-      const slice = closes.slice(i - period + 1, i + 1);
-      result.push(slice.reduce((a, b) => a + b) / period);
+      let sum = 0;
+      for (let j = i + 1 - period; j <= i; j++) {
+        sum += closes[j];
+      }
+      sma.push(sum / period);
     }
   }
-  return result;
+  return sma;
 }
 
 // ------------------------------
-// Render Candlestick + SMA
+// Chart rendering
 // ------------------------------
 function renderChart(priceSeries, indicators) {
-  const ctx = document.getElementById("price-chart").getContext("2d");
+  const canvas = document.getElementById("price-chart");
+  if (!canvas) {
+    console.error("price-chart canvas not found");
+    return;
+  }
+  const ctx = canvas.getContext("2d");
 
-  const candles = priceSeries.map(c => ({
-    x: new Date(c.timestamp),
-    o: c.open,
-    h: c.high,
-    l: c.low,
-    c: c.close,
-  }));
+  const labels = priceSeries.map((p) => p.timestamp);
+  const closes = priceSeries.map((p) => p.close);
 
-  const smaValues =
-    indicators && indicators.length === priceSeries.length
-      ? indicators.map(i => i.sma)
-      : computeSMA(priceSeries, 20);
+  // Prefer backend indicator values, but fall back to computing SMA here
+  let sma;
+  if (indicators && indicators.length === priceSeries.length) {
+    sma = indicators.map((p) => p.sma);
+  } else {
+    sma = computeSMAFromPrices(priceSeries, 20);
+  }
 
-  const smaData = priceSeries.map((c, i) => ({
-    x: new Date(c.timestamp),
-    y: smaValues[i],
-  }));
-
-  if (chart) chart.destroy();
+  if (chart) {
+    chart.destroy();
+  }
 
   chart = new Chart(ctx, {
-    type: "candlestick",
+    type: "line",
     data: {
+      labels,
       datasets: [
         {
-          label: "Candles",
-          data: candles,
-          color: {
-            up: "#22c55e",
-            down: "#ef4444",
-            unchanged: "#e5e7eb",
-          },
-        },
-        {
-          type: "line",
-          label: "SMA-20",
-          data: smaData,
-          borderColor: "yellow",
+          label: "Close Price",
+          data: closes,
           borderWidth: 2,
           pointRadius: 0,
+          tension: 0.2,
+        },
+        {
+          label: "SMA-20",
+          data: sma,
+          borderWidth: 2,
+          pointRadius: 0,
+          borderDash: [5, 5],
+          tension: 0.2,
         },
       ],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      interaction: { mode: "index", intersect: false },
+      interaction: {
+        mode: "index",
+        intersect: false,
+      },
       scales: {
-        x: { type: "time", time: { unit: "minute" } },
-        y: { beginAtZero: false },
+        x: {
+          ticks: {
+            display: false,
+          },
+        },
       },
     },
   });
 }
 
 // ------------------------------
-// Load ticker
+// Load data for a ticker
 // ------------------------------
 async function loadTicker(ticker) {
   try {
     const data = await fetchDashboardData(ticker);
-    renderChart(data.price_series, data.indicators);
+    renderChart(data.price_series || [], data.indicators || []);
     updateFundamentalsPanel(data.fundamentals);
     updateStatusBadge(data.metadata?.is_recent);
   } catch (err) {
     console.error(err);
-    alert("Error loading data.");
+    alert("Error loading data. Check console for details.");
   }
 }
 
 // ------------------------------
-// Init
+// Initial setup
 // ------------------------------
 document.addEventListener("DOMContentLoaded", async () => {
   const select = document.getElementById("ticker-select");
+  if (!select) {
+    console.error("ticker-select element not found");
+    return;
+  }
 
   try {
     const { tickers } = await fetchTickers();
-    select.innerHTML = "";
+    if (!tickers || tickers.length === 0) {
+      select.innerHTML = "<option>No tickers available</option>";
+      return;
+    }
 
-    tickers.forEach(t => {
+    select.innerHTML = "";
+    tickers.forEach((t) => {
       const opt = document.createElement("option");
       opt.value = t;
       opt.textContent = t;
       select.appendChild(opt);
     });
 
-    await loadTicker(select.value);
+    const initialTicker = select.value;
+    await loadTicker(initialTicker);
 
-    select.addEventListener("change", () => loadTicker(select.value));
-
+    select.addEventListener("change", () => {
+      loadTicker(select.value);
+    });
   } catch (err) {
     console.error(err);
-    alert("Error loading tickers");
+    alert("Error loading tickers. Check console for details.");
   }
 });
