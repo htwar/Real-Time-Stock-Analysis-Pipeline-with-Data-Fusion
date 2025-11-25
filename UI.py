@@ -19,7 +19,6 @@ COMPANY_NAMES = {
     "NVDA": "NVIDIA Corporation",
     "AMD": "Advanced Micro Devices, Inc.",
     "NFLX": "Netflix, Inc.",
-    "META": "Meta Platforms, Inc.",
 }
 
 def display_name(ticker: str) -> str:

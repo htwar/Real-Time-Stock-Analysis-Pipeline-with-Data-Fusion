@@ -34,7 +34,6 @@ TICKERS = [
     "NVDA",
     "AMD",
     "NFLX",
-    "META",
 ]
 
 # In-memory store: ticker -> list of OHLCV bars

@@ -3,6 +3,9 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
+# Upgrade pip first (prevents many issues)
+RUN pip install --upgrade pip
+
 # Install all Python dependencies required by ALL services
 RUN pip install --no-cache-dir \
     fastapi \
@@ -17,5 +20,5 @@ RUN pip install --no-cache-dir \
 # Copy all service code into the image
 COPY . .
 
-# Default command (will be overridden by each service in docker-compose)
+# Default command (overridden by docker-compose for each service)
 CMD ["python3"]

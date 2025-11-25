@@ -33,7 +33,6 @@ TICKERS = [
     "NVDA",
     "AMD",
     "NFLX",
-    "META",
 ]
 
 # In-memory fundamentals store: ticker -> fundamentals dict
